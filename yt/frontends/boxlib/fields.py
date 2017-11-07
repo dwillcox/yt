@@ -349,7 +349,6 @@ class MaestroFieldInfo(FieldInfoContainer):
     )
 
     def setup_fluid_fields(self):
-        print('in setup_fluid_fields')
         unit_system = self.ds.unit_system
         # pick the correct temperature field
         if self.ds.parameters["use_tfromp"]:
@@ -409,9 +408,7 @@ class MaestroFieldInfo(FieldInfoContainer):
         nuclei = sorted(nuclei, key=lambda x: x.Z)
 
         # Create Microphysics object in the dataset
-        print('Dataset contains nuclei: {}'.format(nuclei))
         self.ds.__init_microphysics__(field_info_container=self, nuclei=nuclei)
-        print('Initialized microphysics: nspec = {}'.format(self.ds.microphysics.network.nspec))
 
 
 def _nice_species_name(field):
