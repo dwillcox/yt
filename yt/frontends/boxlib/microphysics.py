@@ -8,9 +8,10 @@ class Nucleus(object):
     class to hold its properties, define a sorting, and give it a
     pretty printing string
     """
-    def __init__(self, name=None, field=None):
+    def __init__(self, name=None, field=None, omegadot_field=None):
         self.raw = name
         self.field = field # Hold the field name in the dataset
+        self.omegadot_field = omegadot_field
 
         # element symbol and atomic weight
         if name == "p":
@@ -111,6 +112,22 @@ class Microphysics(object):
                                        units="",
                                        display_name=r'xn')
 
+        # Check to see if each Nucleus has an omegadot field
+        # and if so add the omegadots derived field.
+        omegadot_present = True
+        for n in self.network.nuclei:
+            if not n.omegadot_field:
+                omegadot_present = False
+                break
+        if omegadot_present:
+            # create an omegadots field analogous to mass fractions field
+            func = self._create_omegadots_func()
+            field_info_container.add_field(name=("microphysics", "omegadots"),
+                                           sampling_type="cell",
+                                           function=func,
+                                           units="1/s",
+                                           display_name=r'omegadot')
+
         # add helper fields
         func = self._create_sum_xdiva_func()
         field_info_container.add_field(name=("microphysics", "sum_xdiva"),
@@ -149,7 +166,18 @@ class Microphysics(object):
         # may also correspond to spatial indices depending on the
         # dimensionality of the dataset.
         def _func(field, data):
-            return data.ds.arr([data[fn.field] for fn in self.network.nuclei], "")
+            return data.ds.arr([data[n.field] for n in self.network.nuclei], "")
+        return _func
+
+    def _create_omegadots_func(self):
+        # Returns a YTArray object containing the mass fractions
+        # Dimensions of the array are: [species], [spatial], ([spatial], ...)
+        # That is, the first axis corresponds to species, the
+        # second axis corresponds to a spatial index, and subsequent axes
+        # may also correspond to spatial indices depending on the
+        # dimensionality of the dataset.
+        def _func(field, data):
+            return data.ds.arr([data[n.omegadot_field] for n in self.network.nuclei], "")
         return _func
 
     def _create_sum_xdiva_func(self):

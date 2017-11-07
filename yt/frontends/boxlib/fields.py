@@ -389,7 +389,11 @@ class MaestroFieldInfo(FieldInfoContainer):
                     else:
                         element, weight = field[2:3], field[3:-1]  # NOQA
                     weight = int(weight)
-                    nuclei.append(Nucleus(name=field[2:-1], field=('boxlib', field)))
+                    omegadot_field_name = ('boxlib', 'omegadot({})'.format(field[2:-1]))
+                    if not omegadot_field_name in self.ds.field_list:
+                        omegadot_field_name = None
+                    nuclei.append(Nucleus(name = field[2:-1], field = ('boxlib', field),
+                                          omegadot_field = omegadot_field_name))
 
                 # Here we can, later, add number density using 'element' and
                 # 'weight' inferred above
