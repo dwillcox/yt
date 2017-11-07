@@ -45,6 +45,8 @@ from .fields import \
     CastroFieldInfo, \
     WarpXFieldInfo
 
+from yt.frontends.boxlib.microphysics import Microphysics
+
 # This is what we use to find scientific notation that might include d's
 # instead of e's.
 _scinot_finder = re.compile(r"[-+]?[0-9]*\.?[0-9]+([eEdD][-+]?[0-9]+)?")
@@ -1123,10 +1125,11 @@ class CastroDataset(BoxlibDataset):
             self.particle_types_raw = self.particle_types
 
 
-
 class MaestroDataset(BoxlibDataset):
 
     _field_info_class = MaestroFieldInfo
+
+    microphysics = None
 
     def __init__(self, output_dir,
                  cparam_filename=None,
@@ -1135,7 +1138,7 @@ class MaestroDataset(BoxlibDataset):
                  storage_filename=None,
                  units_override=None,
                  unit_system="cgs"):
-        
+
         super(MaestroDataset, self).__init__(output_dir,
                                              cparam_filename,
                                              fparam_filename,
@@ -1143,6 +1146,12 @@ class MaestroDataset(BoxlibDataset):
                                              storage_filename,
                                              units_override,
                                              unit_system)
+
+        self.fluid_types += ("microphysics",)
+
+    def __init_microphysics__(self, field_info_container=None, nuclei=None):
+        self.microphysics = Microphysics(field_info_container = field_info_container,
+                                         nuclei = nuclei)
 
     @classmethod
     def _is_valid(cls, *args, **kwargs):

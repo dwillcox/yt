@@ -20,6 +20,8 @@ from yt.fields.field_info_container import \
     FieldInfoContainer
 from yt.units import YTQuantity
 
+from .microphysics import Nucleus
+
 rho_units = "code_mass / code_length**3"
 mom_units = "code_mass / (code_time * code_length**2)"
 eden_units = "code_mass / (code_time**2 * code_length)" # erg / cm^3
@@ -347,6 +349,7 @@ class MaestroFieldInfo(FieldInfoContainer):
     )
 
     def setup_fluid_fields(self):
+        print('in setup_fluid_fields')
         unit_system = self.ds.unit_system
         # pick the correct temperature field
         if self.ds.parameters["use_tfromp"]:
@@ -355,6 +358,8 @@ class MaestroFieldInfo(FieldInfoContainer):
         else:
             self.alias(("gas", "temperature"), ("boxlib", "tfromh"),
                        units=unit_system["temperature"])
+
+        nuclei = [] # list of Nuclei objects
 
         # Add X's and omegadots, units of 1/s
         for _, field in self.ds.field_list:
@@ -385,6 +390,7 @@ class MaestroFieldInfo(FieldInfoContainer):
                     else:
                         element, weight = field[2:3], field[3:-1]  # NOQA
                     weight = int(weight)
+                    nuclei.append(Nucleus(name=field[2:-1], field=('boxlib', field)))
 
                 # Here we can, later, add number density using 'element' and
                 # 'weight' inferred above
@@ -393,10 +399,19 @@ class MaestroFieldInfo(FieldInfoContainer):
                 nice_name, tex_label = _nice_species_name(field)
                 display_name = r'\dot{\omega}\left[%s\right]' % tex_label
                 # Overwrite field to use nicer tex_label'ed display_name
-                self.add_output_field(("boxlib", field), sampling_type="cell",  units=unit_system["frequency"],
+                self.add_output_field(("boxlib", field), sampling_type="cell",
+                                      units=unit_system["frequency"],
                                       display_name=display_name)
                 self.alias(("gas", "%s_creation_rate" % nice_name),
                            ("boxlib", field), units=unit_system["frequency"])
+
+        # Sort nuclei by proton number
+        nuclei = sorted(nuclei, key=lambda x: x.Z)
+
+        # Create Microphysics object in the dataset
+        print('Dataset contains nuclei: {}'.format(nuclei))
+        self.ds.__init_microphysics__(field_info_container=self, nuclei=nuclei)
+        print('Initialized microphysics: nspec = {}'.format(self.ds.microphysics.network.nspec))
 
 
 def _nice_species_name(field):
