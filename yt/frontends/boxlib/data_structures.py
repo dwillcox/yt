@@ -1129,7 +1129,7 @@ class MaestroDataset(BoxlibDataset):
 
     _field_info_class = MaestroFieldInfo
 
-    microphysics = None
+    microphysics = Microphysics()
 
     def __init__(self, output_dir,
                  cparam_filename=None,
@@ -1148,10 +1148,6 @@ class MaestroDataset(BoxlibDataset):
                                              unit_system)
 
         self.fluid_types += ("microphysics",)
-
-    def __init_microphysics__(self, field_info_container=None, nuclei=None):
-        self.microphysics = Microphysics(field_info_container = field_info_container,
-                                         nuclei = nuclei)
 
     @classmethod
     def _is_valid(cls, *args, **kwargs):
@@ -1183,6 +1179,36 @@ class MaestroDataset(BoxlibDataset):
                     fields = line.split(":")
                     self.parameters[fields[0]] = fields[1].strip()
                 line = next(f)
+
+            # Get Species Information to setup Microphysics
+            # Maestro writes the columns: (index, name, short name, A, Z)
+            species_info = {'index': [], 'name': [], 'short name': [],
+                            'A': [], 'Z': []}
+            line = ""
+            while not line.startswith(" Species Information"):
+                line = next(f)
+            _ = next(f)
+            _ = next(f)
+            _ = next(f)
+            while not line.startswith("="):
+                line = next(f)
+                if line.strip():
+                    lss = line.strip().split()
+                    species_info['index'].append(int(lss[0]))
+                    species_info['name'].append(lss[1])
+                    species_info['short name'].append(lss[2])
+                    species_info['A'].append(float(lss[3]))
+                    species_info['Z'].append(float(lss[4]))
+
+            # Setup Microphysics network
+            nuclei = []
+            for nname, nA, nZ in zip(species_info['short name'],
+                                     species_info['A'],
+                                     species_info['Z']):
+                nuclei.append(Nucleus(name=nname, specA=nA, specZ=nZ))
+
+            self.microphysics.setup_network(nuclei)
+
             # get the runtime parameters
             for line in f:
                 p, v = (_.strip() for _ in line[4:].split("=", 1))

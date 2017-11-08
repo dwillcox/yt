@@ -358,8 +358,6 @@ class MaestroFieldInfo(FieldInfoContainer):
             self.alias(("gas", "temperature"), ("boxlib", "tfromh"),
                        units=unit_system["temperature"])
 
-        nuclei = [] # list of Nuclei objects
-
         # Add X's and omegadots, units of 1/s
         for _, field in self.ds.field_list:
             if field.startswith("X("):
@@ -389,14 +387,13 @@ class MaestroFieldInfo(FieldInfoContainer):
                     else:
                         element, weight = field[2:3], field[3:-1]  # NOQA
                     weight = int(weight)
-                    omegadot_field_name = ('boxlib', 'omegadot({})'.format(field[2:-1]))
-                    if not omegadot_field_name in self.ds.field_list:
-                        omegadot_field_name = None
-                    nuclei.append(Nucleus(name = field[2:-1], field = ('boxlib', field),
-                                          omegadot_field = omegadot_field_name))
 
                 # Here we can, later, add number density using 'element' and
                 # 'weight' inferred above
+
+                # Set species field name in Microphysics
+                specname = field[2:-1]
+                self.ds.microphysics.network.set_field(specname, ('boxlib', field))
 
             elif field.startswith("omegadot("):
                 nice_name, tex_label = _nice_species_name(field)
@@ -408,11 +405,12 @@ class MaestroFieldInfo(FieldInfoContainer):
                 self.alias(("gas", "%s_creation_rate" % nice_name),
                            ("boxlib", field), units=unit_system["frequency"])
 
-        # Sort nuclei by proton number
-        nuclei = sorted(nuclei, key=lambda x: x.Z)
+                # Set species omegadot field name in Microphysics
+                specname = field[9:-1]
+                self.ds.microphysics.network.set_omegadot_field(specname, ('boxlib', field))
 
-        # Create Microphysics object in the dataset
-        self.ds.__init_microphysics__(field_info_container=self, nuclei=nuclei)
+        # Setup derived fields using Microphysics
+        self.ds.microphysics.setup_fields(field_info_container=self)
 
 
 def _nice_species_name(field):

@@ -8,48 +8,86 @@ class Nucleus(object):
     class to hold its properties, define a sorting, and give it a
     pretty printing string
     """
-    def __init__(self, name=None, field=None, omegadot_field=None):
+    def __init__(self, name=None, specA=-1, specZ=-1, field=None, omegadot_field=None):
+        # specA and specZ are used to set A, Z, N for a species if it cannot be found
+        # in the periodictable based on the name argument. This allows for networks
+        # that specify e.g. an "ash" species that might represent a mixture of various
+        # nuclei not carried individually in the network. specA or specZ may thus be floats.
+
         self.raw = name
-        self.field = field # Hold the field name in the dataset
+
+        # Hold the field name in the dataset and its omegadot,
+        # if provided.
+        self.field = field
         self.omegadot_field = omegadot_field
+
+        is_physical_species = False
 
         # element symbol and atomic weight
         if name == "p":
             self.el = "H"
             self.A = 1
             self.short_spec_name = "h1"
+            is_physical_species = True
         elif name == "d":
             self.el = "H"
             self.A = 2
             self.short_spec_name = "h2"
+            is_physical_species = True
         elif name == "t":
             self.el = "H"
             self.A = 3
             self.short_spec_name = "h3"
+            is_physical_species = True
         elif name == "n":
             self.el = "n"
             self.A = 1
             self.short_spec_name = "n"
+            is_physical_species = True
         else:
             e = re.match("([a-zA-Z]*)(\d*)", name)
-            self.el = e.group(1).title()  # chemical symbol
+            if e:
+                self.el = e.group(1).title()  # chemical symbol
 
-            self.A = int(e.group(2))
-            self.short_spec_name = name
+                self.A = int(e.group(2))
+                self.short_spec_name = name
+                is_physical_species = True
+            else:
+                # we could not identify a nuclear species, so create a Nucleus
+                # with A and Z (and N) set by specA and specZ, if supplied.
+                # If specA and specZ are not supplied, this is an error.
+                if (specA >= 0 and specZ >= 0):
+                    is_physical_species = False
+                    self.el = self.raw
+                    self.A = float(specA)
+                    self.Z = float(specZ)
+                    self.N = self.A - self.Z
+                else:
+                    raise RuntimeError("microphysics: did not recognize species {}.".format(name))
 
-        # atomic number comes from periodtable
-        i = elements.isotope("{}-{}".format(self.A, self.el))
-        self.Z = i.number
-        self.N = self.A - self.Z
+        if is_physical_species:
+            # atomic number comes from periodtable
+            i = elements.isotope("{}-{}".format(self.A, self.el))
+            self.Z = i.number
+            self.N = self.A - self.Z
 
-        # long name
-        if i.name == 'neutron':
-            self.spec_name = i.name
+            # long name
+            if i.name == 'neutron':
+                self.spec_name = i.name
+            else:
+                self.spec_name = '{}-{}'.format(i.name, self.A)
+
+            # latex formatted style
+            self.pretty = r"{{}}^{{{}}}\mathrm{{{}}}".format(self.A, self.el)
         else:
-            self.spec_name = '{}-{}'.format(i.name, self.A)
+            # latex formatted style
+            self.pretty = r"\mathrm{{{}}}".format(self.raw)
 
-        # latex formatted style
-        self.pretty = r"{{}}^{{{}}}\mathrm{{{}}}".format(self.A, self.el)
+    def set_field(self, field):
+        self.field = field
+
+    def set_omegadot_field(self, omegadot_field):
+        self.omegadot_field = omegadot_field
 
     def __repr__(self):
         return self.raw
@@ -85,24 +123,48 @@ class Network(object):
             self.aion_inv = 1.0/self.aion
             self.zdiva = self.zion * self.aion_inv
 
-    def get_nucleus_index(self, nucleus_name):
+    def __contains__(self, nucleus_name):
+        inuc = self._get_nucleus_index(nucleus_name, silent_failure=True)
+        if inuc != -1:
+            return True
+        else:
+            return False
+
+    def _get_nucleus_index(self, name, silent_failure=False):
         # Given a string naming a nucleus, return the index into
         # self.nuclei where it may be found. Returns -1 if
         # the nucleus is not present.
-        ntest = Nucleus(nucleus_name)
         for i, ni in enumerate(self.nuclei):
-            if ni == ntest:
+            if ni.raw == name:
                 return i
-        return -1
+        if silent_failure:
+            return -1
+        else:
+            raise RuntimeError("microphysics: species {} could not be found in network.".format(name))
+
+    def set_field(self, nucleus_name, field_name):
+        inuc = self._get_nucleus_index(nucleus_name)
+        self.nuclei[inuc].set_field(field_name)
+
+    def set_omegadot_field(self, nucleus_name, omegadot_field_name):
+        inuc = self._get_nucleus_index(nucleus_name)
+        self.nuclei[inuc].set_omegadot_field(omegadot_field_name)
 
 class Microphysics(object):
     # Holds dataset attributes relevant to its microphysics
     network = None
 
     def __init__(self, field_info_container=None, nuclei=None):
+        if nuclei:
+            self.setup_network(nuclei)
+        if field_info_container:
+            self.setup_fields(field_info_container)
+
+    def setup_network(self, nuclei=None):
         # nuclei should be a list of Nucleus objects
         self.network = Network(nuclei)
 
+    def setup_fields(self, field_info_container=None):
         # create derived fields in the supplied field_info_container
         # add mass fractions field
         func = self._create_massfrac_func()
