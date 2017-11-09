@@ -1095,7 +1095,7 @@ class CastroDataset(BoxlibDataset):
                 if any(b in line for b in bcs):
                     p, v = line.strip().split(":")
                     self.parameters[p] = v.strip()
-                if "git hash" in line:
+                if "git describe" in line:
                     # line format: codename git hash:  the-hash
                     fields = line.split(":")
                     self.parameters[fields[0]] = fields[1].strip()
