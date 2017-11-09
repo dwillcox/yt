@@ -159,6 +159,12 @@ class Network(object):
         inuc = self._get_nucleus_index(nucleus_name)
         self.nuclei[inuc].set_omegadot_field(omegadot_field_name)
 
+    def has_omegadot_fields(self):
+        for n in self.nuclei:
+            if not n.omegadot_field:
+                return False
+        return True
+
 class Microphysics(object):
     # Holds dataset attributes relevant to its microphysics
     network = None
@@ -189,19 +195,15 @@ class Microphysics(object):
 
         # Check to see if each Nucleus has an omegadot field
         # and if so add the omegadots derived field.
-        omegadot_present = True
-        for n in self.network.nuclei:
-            if not n.omegadot_field:
-                omegadot_present = False
-                break
-        if omegadot_present:
+        if self.network.has_omegadot_fields():
+            print('creating omegadots field')
             # create an omegadots field analogous to mass fractions field
             func = self._create_omegadots_func()
             field_info_container.add_field(name=("microphysics", "omegadots"),
                                            sampling_type="cell",
                                            function=func,
                                            units="1/s",
-                                           display_name=r'omegadot')
+                                           display_name=r'omegadots')
             self.field_list.append(("microphysics", "omegadots"))
 
         # add helper fields
