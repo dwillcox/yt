@@ -1046,6 +1046,8 @@ class CastroDataset(BoxlibDataset):
     _index_class = CastroHierarchy
     _field_info_class = CastroFieldInfo
 
+    microphysics = Microphysics()
+
     def __init__(self, output_dir,
                  cparam_filename=None,
                  fparam_filename=None,
@@ -1061,6 +1063,8 @@ class CastroDataset(BoxlibDataset):
                                             storage_filename,
                                             units_override,
                                             unit_system)
+
+        self.fluid_types += ("microphysics",)
 
     @classmethod
     def _is_valid(cls, *args, **kwargs):
@@ -1085,7 +1089,7 @@ class CastroDataset(BoxlibDataset):
         jobinfo_filename = os.path.join(self.output_dir, "job_info")
         line = ""
         with open(jobinfo_filename, "r") as f:
-            while not line.startswith(" Inputs File Parameters"):
+            while not line.startswith(" Species Information"):
                 # boundary condition info starts with -x:, etc.
                 bcs = ["-x:", "+x:", "-y:", "+y:", "-z:", "+z:"]
                 if any(b in line for b in bcs):
@@ -1096,7 +1100,36 @@ class CastroDataset(BoxlibDataset):
                     fields = line.split(":")
                     self.parameters[fields[0]] = fields[1].strip()
                 line = next(f)
-            
+
+            # Get Species Information to setup Microphysics
+            # Castro writes the columns: (index, name, A, Z)
+            species_info = {'index': [], 'name': [], 'A': [], 'Z': []}
+
+            _ = next(f)
+            _ = next(f)
+            line = next(f)
+            while line.strip():
+                line = next(f)
+                if line.strip():
+                    lss = line.strip().split()
+                    species_info['index'].append(int(lss[0]))
+                    species_info['name'].append(lss[1])
+                    species_info['A'].append(float(lss[2]))
+                    species_info['Z'].append(float(lss[3]))
+
+            # Setup Microphysics network
+            nuclei = []
+            for nname, nA, nZ in zip(species_info['name'],
+                                     species_info['A'],
+                                     species_info['Z']):
+                nuclei.append(Nucleus(name=nname, specA=nA, specZ=nZ))
+
+            self.microphysics.setup_network(nuclei)
+
+            # Advance to inputs file parameters section
+            while not line.startswith(" Inputs File Parameters"):
+                line = next(f)
+
             # runtime parameters that we overrode follow "Inputs File
             # Parameters"
             # skip the "====..." line
@@ -1105,7 +1138,6 @@ class CastroDataset(BoxlibDataset):
                 p, v = line.strip().split("=")
                 self.parameters[p] = v.strip()
 
-            
         # hydro method is set by the base class -- override it here
         self.parameters["HydroMethod"] = "Castro"
 
@@ -1172,13 +1204,21 @@ class MaestroDataset(BoxlibDataset):
         jobinfo_filename = os.path.join(self.output_dir, "job_info")
         line = ""
         with open(jobinfo_filename, "r") as f:
+            # get the code git hashes
+            line = ""
+            while not line.startswith(" Species Information"):
+                # get the code git hashes
+                if "git hash" in line:
+                    # line format: codename git hash:  the-hash
+                    fields = line.split(":")
+                    self.parameters[fields[0]] = fields[1].strip()
+                line = next(f)
+
             # Get Species Information to setup Microphysics
             # Maestro writes the columns: (index, name, short name, A, Z)
             species_info = {'index': [], 'name': [], 'short name': [],
                             'A': [], 'Z': []}
 
-            while not line.startswith(" Species Information"):
-                line = next(f)
             _ = next(f)
             _ = next(f)
             line = next(f)
@@ -1201,14 +1241,7 @@ class MaestroDataset(BoxlibDataset):
 
             self.microphysics.setup_network(nuclei)
 
-            # get the code git hashes
-            line = ""
             while not line.startswith(" [*] indicates overridden default"):
-                # get the code git hashes
-                if "git hash" in line:
-                    # line format: codename git hash:  the-hash
-                    fields = line.split(":")
-                    self.parameters[fields[0]] = fields[1].strip()
                 line = next(f)
 
             # get the runtime parameters
@@ -1363,7 +1396,10 @@ def _guess_pcast(vals):
             pcast = float
         else:
             pcast = int
-    vals = [pcast(value) for value in vals.split()]
+    if pcast == bool:
+        vals = [value=="T" for value in vals.split()]
+    else:
+        vals = [pcast(value) for value in vals.split()]
     if len(vals) == 1:
         vals = vals[0]
     return vals
