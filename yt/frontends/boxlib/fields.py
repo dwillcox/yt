@@ -291,6 +291,18 @@ class CastroFieldInfo(FieldInfoContainer):
                 # Here we can, later, add number density
                 # right now element and weight inferred above are unused
 
+                # Set species field name in Microphysics
+                specname = field[2:-1]
+                self.ds.microphysics.network.set_field(specname, ('boxlib', field))
+
+            elif field.startswith("omegadot_"):
+                # Set species omegadot field name in Microphysics
+                specname = field[9:]
+                self.ds.microphysics.network.set_omegadot_field(specname, ('boxlib', field))
+
+        # Setup derived fields using Microphysics
+        self.ds.microphysics.setup_fields(field_info_container=self)
+
 
 class MaestroFieldInfo(FieldInfoContainer):
 
