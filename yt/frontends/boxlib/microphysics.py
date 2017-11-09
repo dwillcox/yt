@@ -113,6 +113,7 @@ class Network(object):
     zdiva  = []
     nuclei = [] # List of Nucleus objects
 
+
     def __init__(self, nuclei=None):
         # nuclei should be a list of Nucleus objects
         if nuclei:
@@ -129,6 +130,14 @@ class Network(object):
             return True
         else:
             return False
+
+    def nucleus(self, nname):
+        # Return the Nucleus object corresponding to the nucleus name nname
+        idx = self._get_nucleus_index(nname, silent_failure=True)
+        if idx != -1:
+            return self.nuclei[idx]
+        else:
+            return None
 
     def _get_nucleus_index(self, name, silent_failure=False):
         # Given a string naming a nucleus, return the index into
@@ -154,6 +163,9 @@ class Microphysics(object):
     # Holds dataset attributes relevant to its microphysics
     network = None
 
+    # Holds a list of fields particular to the Microphysics class
+    field_list = []
+
     def __init__(self, field_info_container=None, nuclei=None):
         if nuclei:
             self.setup_network(nuclei)
@@ -173,6 +185,7 @@ class Microphysics(object):
                                        function=func,
                                        units="",
                                        display_name=r'xn')
+        self.field_list.append(("microphysics", "mass_fractions"))
 
         # Check to see if each Nucleus has an omegadot field
         # and if so add the omegadots derived field.
@@ -189,6 +202,7 @@ class Microphysics(object):
                                            function=func,
                                            units="1/s",
                                            display_name=r'omegadot')
+            self.field_list.append(("microphysics", "omegadots"))
 
         # add helper fields
         func = self._create_sum_xdiva_func()
@@ -197,6 +211,7 @@ class Microphysics(object):
                                        function=func,
                                        units="",
                                        display_name=r'sum(xn/aion)')
+        self.field_list.append(("microphysics", "sum_xdiva"))
 
         # add electron fraction, abar, and zbar fields
         func = self._create_abar_func()
@@ -205,6 +220,7 @@ class Microphysics(object):
                                        function=func,
                                        units="",
                                        display_name=r'abar')
+        self.field_list.append(("microphysics", "abar"))
 
         func = self._create_electron_fraction_func()
         field_info_container.add_field(name=("microphysics", "electron_fraction"),
@@ -212,6 +228,7 @@ class Microphysics(object):
                                        function=func,
                                        units="",
                                        display_name=r'ye')
+        self.field_list.append(("microphysics", "electron_fraction"))
 
         func = self._create_zbar_func()
         field_info_container.add_field(name=("microphysics", "zbar"),
@@ -219,6 +236,7 @@ class Microphysics(object):
                                        function=func,
                                        units="",
                                        display_name=r'zbar')
+        self.field_list.append(("microphysics", "zbar"))
 
     def _create_massfrac_func(self):
         # Returns a YTArray object containing the mass fractions

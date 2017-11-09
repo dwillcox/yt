@@ -45,7 +45,7 @@ from .fields import \
     CastroFieldInfo, \
     WarpXFieldInfo
 
-from yt.frontends.boxlib.microphysics import Microphysics
+from yt.frontends.boxlib.microphysics import Microphysics, Nucleus
 
 # This is what we use to find scientific notation that might include d's
 # instead of e's.
@@ -1172,25 +1172,17 @@ class MaestroDataset(BoxlibDataset):
         jobinfo_filename = os.path.join(self.output_dir, "job_info")
         line = ""
         with open(jobinfo_filename, "r") as f:
-            while not line.startswith(" [*] indicates overridden default"):
-                # get the code git hashes
-                if "git hash" in line:
-                    # line format: codename git hash:  the-hash
-                    fields = line.split(":")
-                    self.parameters[fields[0]] = fields[1].strip()
-                line = next(f)
-
             # Get Species Information to setup Microphysics
             # Maestro writes the columns: (index, name, short name, A, Z)
             species_info = {'index': [], 'name': [], 'short name': [],
                             'A': [], 'Z': []}
-            line = ""
+
             while not line.startswith(" Species Information"):
                 line = next(f)
             _ = next(f)
             _ = next(f)
-            _ = next(f)
-            while not line.startswith("="):
+            line = next(f)
+            while line.strip():
                 line = next(f)
                 if line.strip():
                     lss = line.strip().split()
@@ -1208,6 +1200,16 @@ class MaestroDataset(BoxlibDataset):
                 nuclei.append(Nucleus(name=nname, specA=nA, specZ=nZ))
 
             self.microphysics.setup_network(nuclei)
+
+            # get the code git hashes
+            line = ""
+            while not line.startswith(" [*] indicates overridden default"):
+                # get the code git hashes
+                if "git hash" in line:
+                    # line format: codename git hash:  the-hash
+                    fields = line.split(":")
+                    self.parameters[fields[0]] = fields[1].strip()
+                line = next(f)
 
             # get the runtime parameters
             for line in f:
