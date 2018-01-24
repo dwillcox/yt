@@ -232,6 +232,14 @@ class Microphysics(object):
                                        display_name=r'ye')
         self.field_list.append(("microphysics", "electron_fraction"))
 
+        func = self._create_electron_fraction_asymmetry_func()
+        field_info_container.add_field(name=("microphysics", "electron_fraction_asymmetry"),
+                                       sampling_type="cell",
+                                       function=func,
+                                       units="",
+                                       display_name=r'$\rm{Y_e - 0.5}$')
+        self.field_list.append(("microphysics", "electron_fraction_asymmetry"))
+
         func = self._create_zbar_func()
         field_info_container.add_field(name=("microphysics", "zbar"),
                                        sampling_type="cell",
@@ -288,6 +296,11 @@ class Microphysics(object):
             # Form a dot product between zdiva and the species axis of xn
             ye = np.tensordot(zdiva, xn, axes=([0], [0]))
             return ye
+        return _func
+
+    def _create_electron_fraction_asymmetry_func(self):
+        def _func(field, data):
+            return data[('microphysics', 'electron_fraction')]-0.5
         return _func
 
     def _create_zbar_func(self):
